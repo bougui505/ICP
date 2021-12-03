@@ -95,7 +95,10 @@ def get_topology(resids, chains):
     return adjmat
 
 
-def assign_anchors(coords, coords_ref, dist_thr=None, return_perm=False,
+def assign_anchors(coords,
+                   coords_ref,
+                   dist_thr=None,
+                   return_perm=False,
                    cdist=None):
     """
     Assign the closest anchors with coords coords_ref
@@ -272,22 +275,33 @@ def icp(coords, coords_ref, device, n_iter, dist_thr=3.8, lstsq_fit_thr=0.):
     assignment, sel = assign_anchors(coords_ref, coords_out, dist_thr=dist_thr)
     rmsd = get_RMSD(coords_ref[assignment], coords_out[sel])
     n_assigned = len(sel)
-    print(f"Initial RMSD: {rmsd} Å; n_assigned: {n_assigned}/{len(coords)} at less than {dist_thr} Å")
+    print(
+        f"Initial RMSD: {rmsd} Å; n_assigned: {n_assigned}/{len(coords)} at less than {dist_thr} Å"
+    )
     for i in range(n_iter):
         R, t = find_rigid_alignment(coords_out[sel], coords_ref[assignment])
         coords_out = transform(coords_out, R, t)
-        assignment, sel = assign_anchors(coords_ref, coords_out, dist_thr=dist_thr)
+        assignment, sel = assign_anchors(coords_ref,
+                                         coords_out,
+                                         dist_thr=dist_thr)
         rmsd = get_RMSD(coords_out[sel], coords_ref[assignment])
         n_assigned = len(sel)
-        print_progress(f'{i+1}/{n_iter}: {rmsd} Å; n_assigned: {n_assigned}/{len(coords)} at less than {dist_thr} Å             ')
+        print_progress(
+            f'{i+1}/{n_iter}: {rmsd} Å; n_assigned: {n_assigned}/{len(coords)} at less than {dist_thr} Å             '
+        )
     sys.stdout.write('\n')
     print("---")
+    print(f"RMSD: {rmsd:.3f}")
     if lstsq_fit_thr > 0.:
         coords_out = lstsq_fit(coords_out, coords_ref, dist_thr=lstsq_fit_thr)
-        assignment, sel = assign_anchors(coords_ref, coords_out, dist_thr=dist_thr)
+        assignment, sel = assign_anchors(coords_ref,
+                                         coords_out,
+                                         dist_thr=dist_thr)
         rmsd = get_RMSD(coords_out[sel], coords_ref[assignment])
-        print(f'lstsq_fit: {rmsd} Å; n_assigned: {n_assigned}/{len(coords)} at less than {dist_thr} Å')
-    sys.stdout.write('\n')
+        print(
+            f'lstsq_fit: {rmsd} Å; n_assigned: {n_assigned}/{len(coords)} at less than {dist_thr} Å'
+        )
+        sys.stdout.write('\n')
     return coords_out
 
 
@@ -319,7 +333,9 @@ def lstsq_fit(coords, coords_ref, dist_thr=1.9, ca_dist=3.8):
         X, _ = torch.lstsq(coords_ref[assignment].T, coords[sel].T)
         coords_out[sel] = (coords[sel].T.mm(X[:n])).T
         n_assigned = len(sel)
-        print(f"lstsq_fit: n_assigned: {n_assigned}/{n} at less than {dist_thr} Å")
+        print(
+            f"lstsq_fit: n_assigned: {n_assigned}/{n} at less than {dist_thr} Å"
+        )
     coords_out = coords_out.to(device)
     return coords_out
 
@@ -336,7 +352,8 @@ def get_resids(obj):
 
 def get_sequence(obj):
     aa1 = list("ACDEFGHIKLMNPQRSTVWY")
-    aa3 = "ALA CYS ASP GLU PHE GLY HIS ILE LYS LEU MET ASN PRO GLN ARG SER THR VAL TRP TYR".split()
+    aa3 = "ALA CYS ASP GLU PHE GLY HIS ILE LYS LEU MET ASN PRO GLN ARG SER THR VAL TRP TYR".split(
+    )
     aa123 = dict(zip(aa1, aa3))
     # aa321 = dict(zip(aa3, aa1))
     chains = cmd.get_chains(obj)
@@ -395,14 +412,33 @@ if __name__ == '__main__':
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    parser = argparse.ArgumentParser(description='Iterative Closest Point algorithm for structural alignment')
-    parser.add_argument('--pdb1', type=str, help='First protein structure (mobile)')
-    parser.add_argument('--pdb2', type=str, help='Second protein structure (reference)')
-    parser.add_argument('--niter', type=int, help='Number of iterations (default: 100)',
+    parser = argparse.ArgumentParser(
+        description='Iterative Closest Point algorithm for structural alignment'
+    )
+    parser.add_argument('--pdb1',
+                        type=str,
+                        help='First protein structure (mobile)')
+    parser.add_argument('--pdb2',
+                        type=str,
+                        help='Second protein structure (reference)')
+    parser.add_argument('--niter',
+                        type=int,
+                        help='Number of iterations (default: 100)',
                         default=100)
-    parser.add_argument('--flex', type=float, help='Distance threshold for flexible fitting using least square (default=0, no least square flexible fitting)', default=0.)
-    parser.add_argument('--permute', default=False, help='Permute the coordinates of pdb1 to fit pdb2', action='store_true')
-    parser.add_argument('--debug', default=False, help='Just run the doctest for debug purpose only', action='store_true')
+    parser.add_argument(
+        '--flex',
+        type=float,
+        help=
+        'Distance threshold for flexible fitting using least square (default=0, no least square flexible fitting)',
+        default=0.)
+    parser.add_argument('--permute',
+                        default=False,
+                        help='Permute the coordinates of pdb1 to fit pdb2',
+                        action='store_true')
+    parser.add_argument('--debug',
+                        default=False,
+                        help='Just run the doctest for debug purpose only',
+                        action='store_true')
     args = parser.parse_args()
 
     if args.debug:
@@ -428,12 +464,19 @@ if __name__ == '__main__':
     # cmd.load_coords(coords_out, 'mod')
     # cmd.save('out_align.pdb', selection='mod')
     # Try the ICP
-    coords_out = icp(coords_in, coords_ref, device, args.niter, lstsq_fit_thr=args.flex)
+    coords_out = icp(coords_in,
+                     coords_ref,
+                     device,
+                     args.niter,
+                     lstsq_fit_thr=args.flex)
     resids_ref = None
     chains_ref = None
     seq_ref = None
     if args.permute:
-        _, sel, P = assign_anchors(coords_out, coords_ref, return_perm=True, dist_thr=3.8)
+        _, sel, P = assign_anchors(coords_out,
+                                   coords_ref,
+                                   return_perm=True,
+                                   dist_thr=3.8)
         coords_out = coords_out.T.mm(P).T
         torm = cmd.select('mod') - coords_out.shape[0]
         resids = get_resids('mod')
@@ -444,6 +487,9 @@ if __name__ == '__main__':
         chains_ref = get_chain_seq('ref')[sel]
         seq_ref = get_sequence('ref')[sel]
     coords_out = coords_out.cpu().detach().numpy()
-    write_pdb(obj='mod', coords=coords_out,
+    write_pdb(obj='mod',
+              coords=coords_out,
               outfilename=f'{os.path.splitext(args.pdb1)[0]}_icp.pdb',
-              resids=resids_ref, seq=seq_ref, chains=chains_ref)
+              resids=resids_ref,
+              seq=seq_ref,
+              chains=chains_ref)
