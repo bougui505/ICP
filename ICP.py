@@ -453,6 +453,10 @@ if __name__ == '__main__':
                         type=int,
                         help='Number of iterations (default: 100)',
                         default=100)
+    parser.add_argument('--thr',
+                        type=float,
+                        help='Distance threshold for ICP',
+                        default=3.8)
     parser.add_argument(
         '--flex',
         type=float,
@@ -486,6 +490,7 @@ if __name__ == '__main__':
                                        device,
                                        args.niter,
                                        lstsq_fit_thr=args.flex,
+                                       dist_thr=args.thr,
                                        verbose=False)
                 print(f"pdb1: {pdb1}")
                 print(f"pdb2: {pdb2}")
@@ -515,7 +520,8 @@ if __name__ == '__main__':
                            coords_ref,
                            device,
                            args.niter,
-                           lstsq_fit_thr=args.flex)
+                           lstsq_fit_thr=args.flex,
+                           dist_thr=args.thr)
     resids_ref = None
     chains_ref = None
     seq_ref = None
