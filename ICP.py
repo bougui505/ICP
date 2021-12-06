@@ -6,10 +6,12 @@
 # 2020-10-02 10:00:15 (UTC+0200)
 
 import sys
+import os
 import scipy.optimize
 import numpy as np
 import torch
-import pymol.cmd as cmd
+import pymol
+from pymol import cmd
 
 
 def print_progress(instr):
@@ -264,7 +266,13 @@ def find_initial_alignment(coords, coords_ref, fsize=30):
     return R_best, t_best
 
 
-def icp(coords, coords_ref, device, n_iter, dist_thr=3.8, lstsq_fit_thr=0.):
+def icp(coords,
+        coords_ref,
+        device,
+        n_iter,
+        dist_thr=3.8,
+        lstsq_fit_thr=0.,
+        verbose=True):
     """
     Iterative Closest Point
     - lstsq_fit_thr: distance threshold for least square fit (if 0: no lstsq_fit)
@@ -275,9 +283,10 @@ def icp(coords, coords_ref, device, n_iter, dist_thr=3.8, lstsq_fit_thr=0.):
     assignment, sel = assign_anchors(coords_ref, coords_out, dist_thr=dist_thr)
     rmsd = get_RMSD(coords_ref[assignment], coords_out[sel])
     n_assigned = len(sel)
-    print(
-        f"Initial RMSD: {rmsd} Å; n_assigned: {n_assigned}/{len(coords)} at less than {dist_thr} Å"
-    )
+    if verbose:
+        print(
+            f"Initial RMSD: {rmsd} Å; n_assigned: {n_assigned}/{len(coords)} at less than {dist_thr} Å"
+        )
     for i in range(n_iter):
         R, t = find_rigid_alignment(coords_out[sel], coords_ref[assignment])
         coords_out = transform(coords_out, R, t)
@@ -286,23 +295,26 @@ def icp(coords, coords_ref, device, n_iter, dist_thr=3.8, lstsq_fit_thr=0.):
                                          dist_thr=dist_thr)
         rmsd = get_RMSD(coords_out[sel], coords_ref[assignment])
         n_assigned = len(sel)
-        print_progress(
-            f'{i+1}/{n_iter}: {rmsd} Å; n_assigned: {n_assigned}/{len(coords)} at less than {dist_thr} Å             '
-        )
-    sys.stdout.write('\n')
-    print("---")
-    print(f"RMSD: {rmsd:.3f}")
+        if verbose:
+            print_progress(
+                f'{i+1}/{n_iter}: {rmsd} Å; n_assigned: {n_assigned}/{len(coords)} at less than {dist_thr} Å             '
+            )
+    if verbose:
+        sys.stdout.write('\n')
+        print("---")
+        print(f"RMSD: {rmsd:.3f}")
     if lstsq_fit_thr > 0.:
         coords_out = lstsq_fit(coords_out, coords_ref, dist_thr=lstsq_fit_thr)
         assignment, sel = assign_anchors(coords_ref,
                                          coords_out,
                                          dist_thr=dist_thr)
         rmsd = get_RMSD(coords_out[sel], coords_ref[assignment])
-        print(
-            f'lstsq_fit: {rmsd} Å; n_assigned: {n_assigned}/{len(coords)} at less than {dist_thr} Å'
-        )
-        sys.stdout.write('\n')
-    return coords_out
+        if verbose:
+            print(
+                f'lstsq_fit: {rmsd} Å; n_assigned: {n_assigned}/{len(coords)} at less than {dist_thr} Å'
+            )
+            sys.stdout.write('\n')
+    return coords_out, float(rmsd)
 
 
 def lstsq_fit(coords, coords_ref, dist_thr=1.9, ca_dist=3.8):
@@ -379,7 +391,10 @@ def get_coords(pdbfilename, object, device, selection=None):
         selection = f'{object} and name CA'
     else:
         selection = f'{object} and name CA and {selection}'
-    cmd.load(pdbfilename, object=object)
+    try:
+        cmd.load(pdbfilename, object=object)
+    except pymol.CmdException:
+        cmd.fetch(code=pdbfilename, name=object)
     cmd.remove(f'not ({selection}) and {object}')
     coords = cmd.get_coords(selection=object)
     coords = torch.from_numpy(coords)
@@ -415,12 +430,25 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Iterative Closest Point algorithm for structural alignment'
     )
-    parser.add_argument('--pdb1',
-                        type=str,
-                        help='First protein structure (mobile)')
-    parser.add_argument('--pdb2',
-                        type=str,
-                        help='Second protein structure (reference)')
+    parser.add_argument(
+        '--pdb1',
+        type=str,
+        help=
+        'First protein structure (mobile). If a PDB code is given the file is downloaded from the PDB'
+    )
+    parser.add_argument(
+        '--pdb2',
+        type=str,
+        help=
+        'Second protein structure (reference). If a PDB code is given the file is downloaded from the PDB'
+    )
+    parser.add_argument(
+        '--pdbs',
+        type=str,
+        nargs='+',
+        help=
+        'Pairwise RMSD calculation using ICP. If a PDB code is given the file is downloaded from the PDB'
+    )
     parser.add_argument('--niter',
                         type=int,
                         help='Number of iterations (default: 100)',
@@ -446,6 +474,25 @@ if __name__ == '__main__':
         doctest.testmod()
         sys.exit()
 
+    if args.pdbs is not None:
+        cmd.set('fetch_path', os.path.expanduser('~/pdb'))
+        for i, pdb1 in enumerate(args.pdbs):
+            coords_ref = get_coords(pdb1, 'ref', device)
+            for pdb2 in args.pdbs[i + 1:]:
+                coords_in = get_coords(pdb2, 'mod', device=device)
+                cmd.delete('mod')
+                coords_out, rmsd = icp(coords_in,
+                                       coords_ref,
+                                       device,
+                                       args.niter,
+                                       lstsq_fit_thr=args.flex,
+                                       verbose=False)
+                print(f"pdb1: {pdb1}")
+                print(f"pdb2: {pdb2}")
+                print(f"rmsd: {rmsd:.3f}")
+            cmd.delete('ref')
+        sys.exit(0)
+
     if args.pdb1 is None or args.pdb2 is None:
         print("")
         print("The following arguments are required: --pdb1, --pdb2")
@@ -464,11 +511,11 @@ if __name__ == '__main__':
     # cmd.load_coords(coords_out, 'mod')
     # cmd.save('out_align.pdb', selection='mod')
     # Try the ICP
-    coords_out = icp(coords_in,
-                     coords_ref,
-                     device,
-                     args.niter,
-                     lstsq_fit_thr=args.flex)
+    coords_out, rmsd = icp(coords_in,
+                           coords_ref,
+                           device,
+                           args.niter,
+                           lstsq_fit_thr=args.flex)
     resids_ref = None
     chains_ref = None
     seq_ref = None
