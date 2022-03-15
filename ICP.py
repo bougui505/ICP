@@ -495,6 +495,7 @@ if __name__ == '__main__':
                 print(f"pdb1: {pdb1}")
                 print(f"pdb2: {pdb2}")
                 print(f"rmsd: {rmsd:.3f}")
+                print()
             cmd.delete('ref')
         sys.exit(0)
 
