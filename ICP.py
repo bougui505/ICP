@@ -262,7 +262,7 @@ def find_initial_alignment(coords, coords_ref, fsize=30):
     return R_best, t_best
 
 
-def icp(coords, coords_ref, device, maxiter, dist_thr=3.8, lstsq_fit_thr=0., verbose=True, stop=1e-3):
+def icp(coords, coords_ref, device, maxiter, dist_thr=3.8, lstsq_fit_thr=0., verbose=True, stop=1e-3, return_Rt=False):
     """
     Iterative Closest Point
     - lstsq_fit_thr: distance threshold for least square fit (if 0: no lstsq_fit)
@@ -298,7 +298,10 @@ def icp(coords, coords_ref, device, maxiter, dist_thr=3.8, lstsq_fit_thr=0., ver
         if verbose:
             print(f'lstsq_fit: {rmsd} Å; n_assigned: {n_assigned}/{len(coords)} at less than {dist_thr} Å')
             sys.stdout.write('\n')
-    return coords_out, float(rmsd)
+    if not return_Rt:
+        return coords_out, float(rmsd)
+    else:
+        return R, t
 
 
 def lstsq_fit(coords, coords_ref, dist_thr=1.9, ca_dist=3.8):
