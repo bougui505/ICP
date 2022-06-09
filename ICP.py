@@ -420,6 +420,8 @@ if __name__ == '__main__':
         '--pdb2',
         type=str,
         help='Second protein structure (reference). If a PDB code is given the file is downloaded from the PDB')
+    parser.add_argument('--sel1', default='all')
+    parser.add_argument('--sel2', default='all')
     parser.add_argument(
         '--pdbs',
         type=str,
@@ -475,8 +477,8 @@ if __name__ == '__main__':
         parser.print_help()
         sys.exit(1)
 
-    coords_ref = get_coords(args.pdb2, 'ref', device=device)
-    coords_in = get_coords(args.pdb1, 'mod', device)
+    coords_ref = get_coords(args.pdb2, 'ref', device=device, selection=args.sel2)
+    coords_in = get_coords(args.pdb1, 'mod', device, selection=args.sel1)
     # Try to align
     # R, t = find_rigid_alignment(coords_in, coords_ref)
     # coords_out = transform(coords_in, R, t)
